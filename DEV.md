@@ -1,4 +1,4 @@
-# shp 開発ガイド
+# 開発ガイド
 
 ## 前提
 
@@ -40,6 +40,20 @@ mise run vet        # go vet ./...
 go test ./...
 go vet ./...
 go build ./cmd/shp
+```
+
+## ソースから入れる
+
+リリースバイナリではなくソースから直接入れたい場合。
+
+```sh
+# go install で $GOBIN (デフォルト $HOME/go/bin) に入れる
+go install github.com/uzulla/shpool-launch/cmd/shp@latest
+
+# あるいはこのリポジトリをクローンして任意の場所へ
+git clone https://github.com/uzulla/shpool-launch.git
+cd shpool-launch
+go build -o ~/.local/bin/shp ./cmd/shp
 ```
 
 クロスビルド例:
