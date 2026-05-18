@@ -1,0 +1,127 @@
+# shp 開発ガイド
+
+## 前提
+
+- macOS / Linux
+- Go は [mise](https://mise.jdx.dev/) で管理 (`mise.toml` でバージョン固定)
+- 動作確認には `shpool` 本体が PATH にあると便利 (`mise` 経由で `cargo:shpool` を入れてもよい)
+
+## 環境セットアップ
+
+```sh
+mise install   # mise.toml の Go バージョンを入れる
+```
+
+## ビルド/実行せずに試す
+
+```sh
+go run ./cmd/shp --print-name   # cwd 由来のセッション名を表示 (shpool 不要)
+go run ./cmd/shp --help
+go run ./cmd/shp                # TUI: cwd 名 (デフォルト選択) + 既存セッション
+go run ./cmd/shp my-name        # TUIを介さず指定名で attach
+go run ./cmd/shp -f             # cwd 名で force-attach
+```
+
+## テスト / ビルド
+
+主な操作は `mise run` のタスクから実行できる。`mise tasks` でタスク一覧。
+
+```sh
+mise run build      # go build -o ./bin/shp ./cmd/shp
+mise run install    # ~/.local/bin/shp にインストール
+mise run check      # vet + test
+mise run test       # go test ./...
+mise run vet        # go vet ./...
+```
+
+素の go コマンドでも当然OK。
+
+```sh
+go test ./...
+go vet ./...
+go build ./cmd/shp
+```
+
+クロスビルド例:
+
+```sh
+GOOS=linux  GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o dist/shp-linux-amd64 ./cmd/shp
+GOOS=linux  GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o dist/shp-linux-arm64 ./cmd/shp
+GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o dist/shp-darwin-amd64 ./cmd/shp
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o dist/shp-darwin-arm64 ./cmd/shp
+```
+
+## パッケージ構成
+
+```text
+cmd/shp/main.go              CLI エントリポイント (flag パースと分岐)
+internal/session/name.go     cwd → セッション名の変換
+internal/session/name_test.go
+internal/shpool/attach.go    syscall.Exec で `shpool attach` に置換
+internal/shpool/list.go      `shpool list` 実行と出力パース
+internal/shpool/list_test.go
+internal/tui/select.go       Bubble Tea の peco 風絞り込みTUI
+internal/tui/select_test.go
+```
+
+依存ライブラリは Bubble Tea / Lipgloss のみ。CLI引数パースは標準 `flag`。
+
+## セッション名生成ルール
+
+1. `os.Getwd()` で現在ディレクトリを取得
+2. 絶対パス化 (`filepath.Abs`)
+3. `$HOME` 配下なら `$HOME/` を取り除く
+4. 先頭・末尾の `/` を取り除く
+5. `/` を `.` に置換
+6. 英数字、`.`、`-`、`_` を維持する
+7. それ以外の文字 (空白を含む) はすべて `_` に置換
+
+例:
+
+| 入力 | 出力 |
+| --- | --- |
+| `/home/uzulla/work/company-a/api` | `work.company-a.api` |
+| `/Users/uzulla/src/foo bar/api`   | `src.foo_bar.api` |
+| `/tmp/test/api`                    | `tmp.test.api` |
+| `/Users/uzulla/プロジェクト/api`  | `______.api` (非ASCIIは1文字あたり `_`) |
+
+MVP ではこのルールは固定。将来は `~/work` や `~/src` を root として相対化するなどの設定を追加できる設計にしてある (`session.FromPath(path, home)` で home を引数化済み)。
+
+## attach の実行方式
+
+`shpool attach` 実行時は、子プロセスを起動するのではなく `syscall.Exec` で `shp` プロセスを `shpool` に置き換える (`internal/shpool/attach.go`)。
+これによりシグナル伝播や端末制御が `shpool` に直接渡る。
+
+## `shpool list` パース方針
+
+MVP では出力フォーマットに強く依存しない (`internal/shpool/list.go`)。
+
+- 空行を除外
+- 先頭が `NAME` / `SESSION` などのヘッダ行らしいものは除外
+- 連続2カラムともすべて大文字 (`NAME STATUS` のようなもの) もヘッダ扱い
+- 各行の先頭カラムをセッション名として扱う
+- 候補が0件なら標準エラーに `No shpool sessions found.` を表示して終了
+
+## TUI
+
+`internal/tui/select.go`。Bubble Tea v1 + Lipgloss。
+
+- alt screen で起動
+- 上部に `QUERY> ...` を表示し、下にフィルタ済み候補
+- フィルタ: case-insensitive substring AND (`Filter(items, query)` として独立、テスト対象)
+- キー操作: 文字入力で絞り込み、Backspace、↑ / Ctrl-P、↓ / Ctrl-N、Enter、Esc / Ctrl-C
+- `SelectWithDefault(items, defaultItem)` で「先頭に置く既定項目」を渡せる。既定項目は `(cwd)` ラベル付きで表示され、初期カーソル位置になる。既存リスト内に重複があれば dedupe。
+
+`shp` (引数なし) はこの `SelectWithDefault` を使って `cwd 由来のセッション名` + `shpool list の既存セッション` を一つのリストで提示する。
+
+MVP では fuzzy / negative / 正規表現 / 複数選択 / preview pane / sort 切替は持たない。
+
+## エラー処理
+
+| 状況 | 出力 | 終了コード |
+| --- | --- | --- |
+| `shpool` が PATH に無い | `Error: shpool command not found in PATH. Please install shpool first` | 1 |
+| `shpool list` 失敗 | `Error: shpool list failed: <stderr>` | 1 |
+| セッション0件 | `No shpool sessions found.` (stderr) | 0 |
+| TUI でキャンセル | (何も出さない) | 0 |
+| 不正な引数 | `Error: too many arguments` 等 + usage | 1 |

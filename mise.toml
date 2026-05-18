@@ -1,0 +1,22 @@
+[tools]
+go = "1.25"
+
+[tasks.build]
+description = "Build the shp binary into ./bin/shp"
+run = "go build -o ./bin/shp ./cmd/shp"
+
+[tasks.install]
+description = "Build and install shp to ~/.local/bin/shp"
+run = "go build -o $HOME/.local/bin/shp ./cmd/shp"
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.check]
+description = "Run vet and tests"
+depends = ["vet", "test"]
