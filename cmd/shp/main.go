@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/uzulla/shp/internal/session"
-	"github.com/uzulla/shp/internal/shpool"
-	"github.com/uzulla/shp/internal/tui"
+	"github.com/uzulla/shpool-launch/internal/session"
+	"github.com/uzulla/shpool-launch/internal/shpool"
+	"github.com/uzulla/shpool-launch/internal/tui"
 )
 
 const usage = `shp - shpool attach helper

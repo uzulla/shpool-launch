@@ -16,20 +16,20 @@
 グローバルに入れる場合:
 
 ```sh
-mise use -g "go:github.com/uzulla/shp/cmd/shp@latest"
+mise use -g "go:github.com/uzulla/shpool-launch/cmd/shp@latest"
 ```
 
 プロジェクトの `mise.toml` に固定したい場合は:
 
 ```toml
 [tools]
-"go:github.com/uzulla/shp/cmd/shp" = "latest"
+"go:github.com/uzulla/shpool-launch/cmd/shp" = "latest"
 ```
 
 ### `go install`
 
 ```sh
-go install github.com/uzulla/shp/cmd/shp@latest
+go install github.com/uzulla/shpool-launch/cmd/shp@latest
 ```
 
 ### ローカルビルド

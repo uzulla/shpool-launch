@@ -1,4 +1,4 @@
-module github.com/uzulla/shp
+module github.com/uzulla/shpool-launch
 
 go 1.25.10
 
