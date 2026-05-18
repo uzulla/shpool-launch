@@ -1,11 +1,11 @@
-# shp - shpool tui launcher
+# shp - shpool session selector
 
 `shpool attach` を便利にするツール。
 
 - 引数なしで `shp` を実行すると、peco 風の TUI が開く。カレントディレクトリ由来のセッション名が先頭・初期選択になっていて、Enter でそのまま attach できる(無ければ新規作成)。
 - 既存セッションも同じリストに並ぶので、↓ や絞り込みで切り替えて attach できる。
 
-`shpool` 本体が PATH に存在することが前提です。
+`shpool` (https://github.com/shell-pool/shpool) 本体が PATH に存在することが前提です。
 
 ## インストール
 
