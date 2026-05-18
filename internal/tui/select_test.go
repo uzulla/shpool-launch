@@ -3,6 +3,8 @@ package tui
 import (
 	"reflect"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestOrderWithDefault(t *testing.T) {
@@ -59,6 +61,40 @@ func TestOrderWithDefault(t *testing.T) {
 				t.Errorf("orderWithDefault(%v, %q) = %v, want %v", tc.items, tc.defaultItem, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestModelBackspaceRemovesWholeRune(t *testing.T) {
+	m := newModel([]string{"alpha"})
+	m.query = "あい"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	got := updated.(model).query
+	want := "あ"
+	if got != want {
+		t.Fatalf("query = %q, want %q", got, want)
+	}
+}
+
+func TestModelScrollsCursorIntoVisibleRange(t *testing.T) {
+	m := newModel([]string{"a", "b", "c", "d", "e"})
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Height: 7})
+	m = updated.(model)
+	for i := 0; i < 4; i++ {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = updated.(model)
+	}
+
+	if m.cursor != 4 {
+		t.Fatalf("cursor = %d, want 4", m.cursor)
+	}
+	if m.offset != 2 {
+		t.Fatalf("offset = %d, want 2", m.offset)
+	}
+	start, end := m.visibleRange()
+	if start != 2 || end != 5 {
+		t.Fatalf("visibleRange = (%d, %d), want (2, 5)", start, end)
 	}
 }
 

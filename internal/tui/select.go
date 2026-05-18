@@ -100,6 +100,8 @@ type model struct {
 	filtered    []string
 	query       string
 	cursor      int
+	offset      int
+	height      int
 	selected    string
 	cancelled   bool
 	defaultItem string
@@ -116,6 +118,10 @@ func (m model) Init() tea.Cmd { return nil }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
+		if sizeMsg, ok := msg.(tea.WindowSizeMsg); ok {
+			m.height = sizeMsg.Height
+			m.ensureCursorVisible()
+		}
 		return m, nil
 	}
 	switch keyMsg.Type {
@@ -130,16 +136,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyUp, tea.KeyCtrlP:
 		if m.cursor > 0 {
 			m.cursor--
+			m.ensureCursorVisible()
 		}
 		return m, nil
 	case tea.KeyDown, tea.KeyCtrlN:
 		if m.cursor < len(m.filtered)-1 {
 			m.cursor++
+			m.ensureCursorVisible()
 		}
 		return m, nil
 	case tea.KeyBackspace:
 		if len(m.query) > 0 {
-			m.query = m.query[:len(m.query)-1]
+			m.query = dropLastRune(m.query)
 			m.refilter()
 		}
 		return m, nil
@@ -156,11 +164,64 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) refilter() {
 	m.filtered = Filter(m.all, m.query)
+	if len(m.filtered) == 0 {
+		m.cursor = 0
+		m.offset = 0
+		return
+	}
 	if m.cursor >= len(m.filtered) {
 		m.cursor = len(m.filtered) - 1
 	}
 	if m.cursor < 0 {
 		m.cursor = 0
+	}
+	m.ensureCursorVisible()
+}
+
+func dropLastRune(s string) string {
+	rs := []rune(s)
+	return string(rs[:len(rs)-1])
+}
+
+func (m model) visibleLimit() int {
+	if m.height <= 0 {
+		return len(m.filtered)
+	}
+	limit := m.height - 4
+	if limit < 1 {
+		return 1
+	}
+	if limit > len(m.filtered) {
+		return len(m.filtered)
+	}
+	return limit
+}
+
+func (m *model) ensureCursorVisible() {
+	if len(m.filtered) == 0 {
+		m.offset = 0
+		return
+	}
+	limit := m.visibleLimit()
+	if limit <= 0 {
+		m.offset = 0
+		return
+	}
+	if m.cursor < m.offset {
+		m.offset = m.cursor
+	}
+	if m.cursor >= m.offset+limit {
+		m.offset = m.cursor - limit + 1
+	}
+	maxOffset := len(m.filtered) - limit
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.offset > maxOffset {
+		m.offset = maxOffset
+	}
+	if m.offset < 0 {
+		m.offset = 0
 	}
 }
 
@@ -181,8 +242,10 @@ func (m model) View() string {
 		b.WriteString(dimStyle.Render("  (no matches)"))
 		b.WriteString("\n")
 	}
-	for i, it := range m.filtered {
-		if i == m.cursor {
+	start, end := m.visibleRange()
+	for i, it := range m.filtered[start:end] {
+		actual := start + i
+		if actual == m.cursor {
 			b.WriteString(cursorStyle.Render("> "))
 			b.WriteString(selectedStyle.Render(it))
 		} else {
@@ -199,4 +262,22 @@ func (m model) View() string {
 	b.WriteString(dimStyle.Render("Enter: attach   Esc/Ctrl-C: cancel   ↑/↓ or Ctrl-P/N: move"))
 	b.WriteString("\n")
 	return b.String()
+}
+
+func (m model) visibleRange() (int, int) {
+	if len(m.filtered) == 0 {
+		return 0, 0
+	}
+	limit := m.visibleLimit()
+	if limit <= 0 || limit >= len(m.filtered) {
+		return 0, len(m.filtered)
+	}
+	start := m.offset
+	if start < 0 {
+		start = 0
+	}
+	if start > len(m.filtered)-limit {
+		start = len(m.filtered) - limit
+	}
+	return start, start + limit
 }

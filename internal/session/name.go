@@ -2,6 +2,8 @@
 package session
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,12 +38,16 @@ func FromPath(path, home string) string {
 		}
 	}
 
-	abs = strings.Trim(abs, "/")
-	abs = strings.ReplaceAll(abs, "/", ".")
+	rel := strings.Trim(filepath.ToSlash(abs), "/")
+	if rel == "" {
+		return ""
+	}
+	needsSuffix := needsHashSuffix(rel)
+	nameInput := strings.ReplaceAll(rel, "/", ".")
 
 	var b strings.Builder
-	b.Grow(len(abs))
-	for _, r := range abs {
+	b.Grow(len(nameInput) + 9)
+	for _, r := range nameInput {
 		switch {
 		case r >= 'a' && r <= 'z',
 			r >= 'A' && r <= 'Z',
@@ -52,5 +58,31 @@ func FromPath(path, home string) string {
 			b.WriteRune('_')
 		}
 	}
+	if needsSuffix {
+		b.WriteByte('-')
+		b.WriteString(shortHash(rel))
+	}
 	return b.String()
+}
+
+func needsHashSuffix(rel string) bool {
+	for _, part := range strings.Split(rel, "/") {
+		for _, r := range part {
+			switch {
+			case r >= 'a' && r <= 'z',
+				r >= 'A' && r <= 'Z',
+				r >= '0' && r <= '9',
+				r == '-', r == '_':
+				continue
+			default:
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func shortHash(s string) string {
+	sum := sha1.Sum([]byte(s))
+	return hex.EncodeToString(sum[:])[:8]
 }

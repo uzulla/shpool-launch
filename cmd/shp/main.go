@@ -18,8 +18,8 @@ const usage = `shp - shpool attach helper
 
 Usage:
   shp                      Show a TUI picker. The cwd-derived session name is
-                           the default selection; existing 'shpool list'
-                           sessions follow. Enter attaches.
+                           the default selection; existing sessions follow
+                           when available. Enter attaches.
   shp <session-name>       Attach to the given session name (no TUI).
   shp -f                   Force-attach to a session named after the current
                            directory (no TUI).
@@ -28,6 +28,7 @@ Usage:
                            directory and exit.
   shp -h | --help          Show this help.
 
+New sessions are created in the current directory.
 shpool must be installed and on PATH.
 `
 
@@ -103,7 +104,10 @@ func runPicker() error {
 
 	sessions, err := shpool.List()
 	if err != nil {
-		return err
+		if !errors.Is(err, shpool.ErrListUnavailable) {
+			return err
+		}
+		sessions = nil
 	}
 
 	if cwdName == "" && len(sessions) == 0 {

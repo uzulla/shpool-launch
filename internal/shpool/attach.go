@@ -13,6 +13,9 @@ import (
 // ErrNotFound is returned when the shpool binary is not on PATH.
 var ErrNotFound = errors.New("shpool command not found in PATH. Please install shpool first")
 
+// ErrListUnavailable is returned when shpool cannot provide the session list.
+var ErrListUnavailable = errors.New("shpool session list unavailable")
+
 // LookPath returns the absolute path to the shpool binary or ErrNotFound.
 func LookPath() (string, error) {
 	p, err := exec.LookPath("shpool")
@@ -22,20 +25,26 @@ func LookPath() (string, error) {
 	return p, nil
 }
 
-// Attach replaces the current process with `shpool attach [-f] <name>`.
+// Attach replaces the current process with `shpool attach [-f] --dir . <name>`.
 // On success it does not return.
 func Attach(name string, force bool) error {
 	path, err := LookPath()
 	if err != nil {
 		return err
 	}
-	args := []string{"shpool", "attach"}
-	if force {
-		args = append(args, "-f")
-	}
-	args = append(args, name)
+	args := attachArgs(name, force)
 	if err := syscall.Exec(path, args, os.Environ()); err != nil {
 		return fmt.Errorf("exec shpool: %w", err)
 	}
 	return nil
+}
+
+func attachArgs(name string, force bool) []string {
+	args := []string{"shpool", "attach"}
+	if force {
+		args = append(args, "-f")
+	}
+	args = append(args, "--dir", ".")
+	args = append(args, name)
+	return args
 }

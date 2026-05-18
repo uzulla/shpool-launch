@@ -19,7 +19,7 @@ func TestFromPath(t *testing.T) {
 			name: "spaces replaced",
 			path: "/Users/uzulla/src/foo bar/api",
 			home: "/Users/uzulla",
-			want: "src.foo_bar.api",
+			want: "src.foo_bar.api-a8163889",
 		},
 		{
 			name: "outside home",
@@ -49,14 +49,14 @@ func TestFromPath(t *testing.T) {
 			name: "japanese chars replaced",
 			path: "/Users/uzulla/プロジェクト/api",
 			home: "/Users/uzulla",
-			// 6 runes (プロジェクト) → 6 "_" + "." separator + "api"
-			want: "______.api",
+			// 6 runes (プロジェクト) -> 6 "_" + "." separator + "api" + hash suffix.
+			want: "______.api-f10f1a6e",
 		},
 		{
-			name: "dots in dirname preserved",
+			name: "dots in dirname get disambiguating suffix",
 			path: "/srv/app-v1.2.3/api",
 			home: "",
-			want: "srv.app-v1.2.3.api",
+			want: "srv.app-v1.2.3.api-597dbea5",
 		},
 		{
 			name: "underscores preserved",
@@ -83,8 +83,22 @@ func TestFromPath(t *testing.T) {
 
 func TestFromPath_JapaneseLen(t *testing.T) {
 	got := FromPath("/Users/u/プロジェクト", "/Users/u")
-	want := "______"
+	want := "______-598ab783"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestFromPath_DisambiguatesSanitizedCollisions(t *testing.T) {
+	gotSpace := FromPath("/Users/u/foo bar", "/Users/u")
+	gotUnderscore := FromPath("/Users/u/foo_bar", "/Users/u")
+	if gotSpace == gotUnderscore {
+		t.Fatalf("expected different names, got %q and %q", gotSpace, gotUnderscore)
+	}
+
+	gotDot := FromPath("/Users/u/foo.bar", "/Users/u")
+	gotSlash := FromPath("/Users/u/foo/bar", "/Users/u")
+	if gotDot == gotSlash {
+		t.Fatalf("expected different names, got %q and %q", gotDot, gotSlash)
 	}
 }

@@ -19,7 +19,13 @@ func List() ([]string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		msg := strings.TrimSpace(strings.Join([]string{stderr.String(), stdout.String()}, "\n"))
+		if listUnavailable(msg) {
+			if msg == "" {
+				return nil, fmt.Errorf("%w: %v", ErrListUnavailable, err)
+			}
+			return nil, fmt.Errorf("%w: %s", ErrListUnavailable, msg)
+		}
 		if msg != "" {
 			return nil, fmt.Errorf("shpool list failed: %w: %s", err, msg)
 		}
@@ -28,10 +34,18 @@ func List() ([]string, error) {
 	return ParseList(stdout.Bytes()), nil
 }
 
+func listUnavailable(msg string) bool {
+	msg = strings.ToLower(strings.TrimSpace(msg))
+	return msg == "" ||
+		strings.Contains(msg, "could not connect to daemon") ||
+		strings.Contains(msg, "control socket never came up") ||
+		strings.Contains(msg, "connection refused")
+}
+
 // ParseList extracts session names from `shpool list` output.
 //
 // The first column on each non-empty, non-header line is treated as the
-// session name. Lines that look like a header row are skipped.
+// session name. Lines matching shpool's table header are skipped.
 func ParseList(out []byte) []string {
 	var names []string
 	scanner := bufio.NewScanner(bytes.NewReader(out))
@@ -44,44 +58,16 @@ func ParseList(out []byte) []string {
 		if len(fields) == 0 {
 			continue
 		}
-		first := fields[0]
-		if looksLikeHeader(first, fields) {
+		if looksLikeHeader(fields) {
 			continue
 		}
-		names = append(names, first)
+		names = append(names, fields[0])
 	}
 	return names
 }
 
-// looksLikeHeader returns true for rows that appear to be column headers
-// rather than real session entries.
-func looksLikeHeader(first string, fields []string) bool {
-	upper := strings.ToUpper(first)
-	switch upper {
-	case "NAME", "SESSION", "SESSIONS", "SESSION_NAME", "ID":
-		return true
-	}
-	// All-caps multi-column rows are very likely headers (e.g. "NAME STATUS").
-	if len(fields) >= 2 && isAllUpperWord(first) && isAllUpperWord(fields[1]) {
-		return true
-	}
-	return false
-}
-
-func isAllUpperWord(s string) bool {
-	if s == "" {
-		return false
-	}
-	hasLetter := false
-	for _, r := range s {
-		switch {
-		case r >= 'A' && r <= 'Z':
-			hasLetter = true
-		case r == '_' || r == '-':
-			// allowed
-		default:
-			return false
-		}
-	}
-	return hasLetter
+func looksLikeHeader(fields []string) bool {
+	return len(fields) >= 2 &&
+		strings.EqualFold(fields[0], "NAME") &&
+		strings.EqualFold(fields[1], "STATUS")
 }
