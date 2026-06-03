@@ -243,7 +243,8 @@ func TestModelEnterNormalizesNewNameToSafeCharset(t *testing.T) {
 
 func TestModelViewLabelsSanitizedCollisionAsExisting(t *testing.T) {
 	m := newModel([]string{"foo_bar", "dev.shp"})
-	m.query = "foo/bar" // sanitizes to the existing "foo_bar"
+	m.sessions = []string{"foo_bar", "dev.shp"} // real `shpool list` sessions
+	m.query = "foo/bar"                         // sanitizes to the existing "foo_bar"
 	m.refilter()
 
 	got := m.View()
@@ -255,6 +256,24 @@ func TestModelViewLabelsSanitizedCollisionAsExisting(t *testing.T) {
 	}
 	if !strings.Contains(got, "(existing)") {
 		t.Fatalf("View() = %q, want (existing) label", got)
+	}
+}
+
+func TestModelViewLabelsSyntheticDefaultCollisionAsNew(t *testing.T) {
+	// defaultItem is the cwd-derived name but is NOT a running session, so a
+	// query that sanitizes to it must be labeled (new): Enter creates it.
+	m := newModel([]string{"foo_bar", "dev.shp"})
+	m.defaultItem = "foo_bar"
+	m.sessions = []string{"dev.shp"} // foo_bar is the injected default, not real
+	m.query = "foo/bar"
+	m.refilter()
+
+	got := m.View()
+	if strings.Contains(got, "(existing)") {
+		t.Fatalf("View() = %q, must not label a non-running default as (existing)", got)
+	}
+	if !strings.Contains(got, "(new)") {
+		t.Fatalf("View() = %q, want (new) label", got)
 	}
 }
 

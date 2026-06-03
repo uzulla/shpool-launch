@@ -34,6 +34,7 @@ func SelectWithDefault(items []string, defaultItem string) (string, error) {
 	}
 	m := newModel(all)
 	m.defaultItem = defaultItem
+	m.sessions = append([]string(nil), items...)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	final, err := p.Run()
 	if err != nil {
@@ -108,6 +109,10 @@ type model struct {
 	selected    string
 	cancelled   bool
 	defaultItem string
+	// sessions is the set of real `shpool list` sessions, excluding the
+	// synthetic cwd default that orderWithDefault injects into `all`. It is
+	// what distinguishes an existing session from a to-be-created one.
+	sessions []string
 }
 
 func newModel(items []string) model {
@@ -194,9 +199,10 @@ func (m model) currentSelection() string {
 	return name
 }
 
-// contains reports whether name is already one of the listed sessions.
-func (m model) contains(name string) bool {
-	for _, it := range m.all {
+// isExistingSession reports whether name is a real `shpool list` session,
+// not merely the synthetic cwd default injected for display.
+func (m model) isExistingSession(name string) bool {
+	for _, it := range m.sessions {
 		if it == name {
 			return true
 		}
@@ -309,7 +315,7 @@ func (m model) View() string {
 			// The normalized name can collide with an existing session (e.g.
 			// query "foo/bar" sanitizes to an existing "foo_bar"); label it
 			// honestly so the user knows Enter reattaches, not creates.
-			if m.contains(name) {
+			if m.isExistingSession(name) {
 				b.WriteString(dimStyle.Render("(existing)"))
 			} else {
 				b.WriteString(dimStyle.Render("(new)"))
