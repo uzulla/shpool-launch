@@ -42,7 +42,7 @@ QUERY>
 ```
 
 - Enter でカーソル位置に attach (該当セッションが無ければ `shpool attach --dir .` で現在のディレクトリに新規作成)
-- 絞り込み結果が0件の状態で Enter すると、入力した文字列で新規セッションを作成する。cwd 候補がある状態で `-another` のように `-` から入力した場合は、cwd 候補にサフィックスとして足して `work.company-a.api-another` のように作成する。
+- 絞り込み結果が0件の状態で Enter すると、入力した文字列で新規セッションを作成する。空白を含む入力は作成しない。cwd 候補がある状態で `-another` のように `-` から入力した場合は、cwd 候補にサフィックスとして足して `work.company-a.api-another` のように作成する。
 - 文字を入力すれば case-insensitive substring AND で絞り込める
 - 絞り込みは case-insensitive の substring AND マッチ。`company api` のように空白で AND 検索できる。
 - 候補が画面に収まらない場合はカーソル移動に合わせてスクロールする。

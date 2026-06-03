@@ -129,6 +129,47 @@ func TestModelViewShowsNewDefaultSuffixCandidate(t *testing.T) {
 	}
 }
 
+func TestModelEnterRejectsNewNameWithWhitespace(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.query = "new session"
+	m.refilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := updated.(model).selected
+	if got != "" {
+		t.Fatalf("selected = %q, want empty", got)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd = %v, want nil", cmd)
+	}
+}
+
+func TestModelEnterRejectsLeadingDashWithoutDefault(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.query = "-scratch"
+	m.refilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := updated.(model).selected
+	if got != "" {
+		t.Fatalf("selected = %q, want empty", got)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd = %v, want nil", cmd)
+	}
+}
+
+func TestModelViewShowsInvalidNewSessionName(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.query = "new session"
+	m.refilter()
+
+	got := m.View()
+	if !strings.Contains(got, "(invalid session name)") {
+		t.Fatalf("View() = %q, want invalid session message", got)
+	}
+}
+
 func TestModelScrollsCursorIntoVisibleRange(t *testing.T) {
 	m := newModel([]string{"a", "b", "c", "d", "e"})
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -129,7 +130,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cancelled = true
 		return m, tea.Quit
 	case tea.KeyEnter:
-		m.selected = m.currentSelection()
+		selected := m.currentSelection()
+		if selected == "" {
+			return m, nil
+		}
+		m.selected = selected
 		return m, tea.Quit
 	case tea.KeyUp, tea.KeyCtrlP:
 		if m.cursor > 0 {
@@ -180,18 +185,34 @@ func (m model) currentSelection() string {
 	if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
 		return m.filtered[m.cursor]
 	}
-	return newSessionName(m.defaultItem, m.query)
-}
-
-func newSessionName(defaultItem, query string) string {
-	name := strings.TrimSpace(query)
-	if name == "" {
+	name, ok := newSessionName(m.defaultItem, m.query)
+	if !ok {
 		return ""
 	}
-	if defaultItem != "" && strings.HasPrefix(name, "-") {
-		return defaultItem + name
-	}
 	return name
+}
+
+func newSessionName(defaultItem, query string) (string, bool) {
+	name := strings.TrimSpace(query)
+	if name == "" {
+		return "", false
+	}
+	if defaultItem != "" && strings.HasPrefix(name, "-") {
+		return defaultItem + name, true
+	}
+	if strings.HasPrefix(name, "-") || containsSpace(name) {
+		return "", false
+	}
+	return name, true
+}
+
+func containsSpace(s string) bool {
+	for _, r := range s {
+		if unicode.IsSpace(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func dropLastRune(s string) string {
@@ -255,11 +276,13 @@ func (m model) View() string {
 	b.WriteString("\n\n")
 
 	if len(m.filtered) == 0 {
-		if name := newSessionName(m.defaultItem, m.query); name != "" {
+		if name, ok := newSessionName(m.defaultItem, m.query); ok {
 			b.WriteString(cursorStyle.Render("> "))
 			b.WriteString(selectedStyle.Render(name))
 			b.WriteString(" ")
 			b.WriteString(dimStyle.Render("(new)"))
+		} else if strings.TrimSpace(m.query) != "" {
+			b.WriteString(dimStyle.Render("  (invalid session name)"))
 		} else {
 			b.WriteString(dimStyle.Render("  (no matches)"))
 		}
