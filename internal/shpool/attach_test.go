@@ -16,13 +16,19 @@ func TestAttachArgs(t *testing.T) {
 			test:  "normal",
 			name:  "my-session",
 			force: false,
-			want:  []string{"shpool", "attach", "--dir", ".", "my-session"},
+			want:  []string{"shpool", "attach", "--dir", ".", "--", "my-session"},
 		},
 		{
 			test:  "force",
 			name:  "my-session",
 			force: true,
-			want:  []string{"shpool", "attach", "-f", "--dir", ".", "my-session"},
+			want:  []string{"shpool", "attach", "-f", "--dir", ".", "--", "my-session"},
+		},
+		{
+			test:  "dash-leading name stays positional after --",
+			name:  "-repo-another",
+			force: false,
+			want:  []string{"shpool", "attach", "--dir", ".", "--", "-repo-another"},
 		},
 	}
 	for _, tc := range cases {

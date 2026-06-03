@@ -202,8 +202,19 @@ func newSessionName(defaultItem, query string) (string, bool) {
 	if containsSpace(name) {
 		return "", false
 	}
+	if strings.Trim(name, "-") == "" {
+		// Dash-only input ("-", "--", ...) is not a meaningful name.
+		return "", false
+	}
 	if defaultItem != "" && strings.HasPrefix(name, "-") {
-		return session.Sanitize(defaultItem + name), true
+		candidate := session.Sanitize(defaultItem + name)
+		// Reject when defaultItem itself starts with "-" (e.g. a "~/-repo"
+		// cwd): the combined name would lead with "-" and be misread as an
+		// option by `shpool attach`.
+		if strings.HasPrefix(candidate, "-") {
+			return "", false
+		}
+		return candidate, true
 	}
 	if strings.HasPrefix(name, "-") {
 		return "", false

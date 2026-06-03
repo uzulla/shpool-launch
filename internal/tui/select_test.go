@@ -184,6 +184,38 @@ func TestModelEnterRejectsNewNameWithFullWidthSpace(t *testing.T) {
 	}
 }
 
+func TestModelEnterRejectsDashOnlyNewName(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.defaultItem = "dev.shp"
+	m.query = "--"
+	m.refilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := asModel(t, updated).selected
+	if got != "" {
+		t.Fatalf("selected = %q, want empty", got)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd = %v, want nil", cmd)
+	}
+}
+
+func TestModelEnterRejectsSuffixWhenDefaultLeadsWithDash(t *testing.T) {
+	m := newModel([]string{"-repo"})
+	m.defaultItem = "-repo" // e.g. derived from a "~/-repo" cwd
+	m.query = "-another"
+	m.refilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := asModel(t, updated).selected
+	if got != "" {
+		t.Fatalf("selected = %q, want empty (dash-leading name must not be created)", got)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd = %v, want nil", cmd)
+	}
+}
+
 func TestModelEnterNormalizesNewNameToSafeCharset(t *testing.T) {
 	m := newModel([]string{"dev.shp"})
 	m.query = "foo/bar"

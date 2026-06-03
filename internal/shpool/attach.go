@@ -45,6 +45,8 @@ func attachArgs(name string, force bool) []string {
 		args = append(args, "-f")
 	}
 	args = append(args, "--dir", ".")
-	args = append(args, name)
+	// Terminate option parsing with "--" so a session name that begins with
+	// "-" is always treated as the positional <NAME>, never as a flag.
+	args = append(args, "--", name)
 	return args
 }
