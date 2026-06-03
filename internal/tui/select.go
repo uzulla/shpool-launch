@@ -10,6 +10,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/uzulla/shpool-launch/internal/session"
 )
 
 // ErrCancelled is returned when the user dismisses the UI (Esc / Ctrl-C).
@@ -201,12 +203,12 @@ func newSessionName(defaultItem, query string) (string, bool) {
 		return "", false
 	}
 	if defaultItem != "" && strings.HasPrefix(name, "-") {
-		return defaultItem + name, true
+		return session.Sanitize(defaultItem + name), true
 	}
 	if strings.HasPrefix(name, "-") {
 		return "", false
 	}
-	return name, true
+	return session.Sanitize(name), true
 }
 
 func containsSpace(s string) bool {

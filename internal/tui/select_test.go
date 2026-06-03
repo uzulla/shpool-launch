@@ -169,6 +169,34 @@ func TestModelEnterRejectsNewNameWithWhitespace(t *testing.T) {
 	}
 }
 
+func TestModelEnterRejectsNewNameWithFullWidthSpace(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.query = "新規　セッション" // contains a full-width space (U+3000)
+	m.refilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := asModel(t, updated).selected
+	if got != "" {
+		t.Fatalf("selected = %q, want empty", got)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd = %v, want nil", cmd)
+	}
+}
+
+func TestModelEnterNormalizesNewNameToSafeCharset(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.query = "foo/bar"
+	m.refilter()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := asModel(t, updated).selected
+	want := "foo_bar"
+	if got != want {
+		t.Fatalf("selected = %q, want %q", got, want)
+	}
+}
+
 func TestModelEnterRejectsLeadingDashWithoutDefault(t *testing.T) {
 	m := newModel([]string{"dev.shp"})
 	m.query = "-scratch"
