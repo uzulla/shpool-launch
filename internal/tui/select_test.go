@@ -8,6 +8,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func asModel(t *testing.T, updated tea.Model) model {
+	t.Helper()
+	m, ok := updated.(model)
+	if !ok {
+		t.Fatalf("Update returned %T, want model", updated)
+	}
+	return m
+}
+
 func TestOrderWithDefault(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -70,7 +79,7 @@ func TestModelBackspaceRemovesWholeRune(t *testing.T) {
 	m.query = "あい"
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
-	got := updated.(model).query
+	got := asModel(t, updated).query
 	want := "あ"
 	if got != want {
 		t.Fatalf("query = %q, want %q", got, want)
@@ -81,9 +90,9 @@ func TestModelEnterSelectsHighlightedMatch(t *testing.T) {
 	m := newModel([]string{"alpha", "beta"})
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = updated.(model)
+	m = asModel(t, updated)
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	got := updated.(model).selected
+	got := asModel(t, updated).selected
 	want := "beta"
 	if got != want {
 		t.Fatalf("selected = %q, want %q", got, want)
@@ -96,7 +105,7 @@ func TestModelEnterCreatesTypedNameWhenNoMatch(t *testing.T) {
 	m.refilter()
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	got := updated.(model).selected
+	got := asModel(t, updated).selected
 	want := "new-session"
 	if got != want {
 		t.Fatalf("selected = %q, want %q", got, want)
@@ -110,10 +119,26 @@ func TestModelEnterCreatesDefaultSuffixWhenNoMatch(t *testing.T) {
 	m.refilter()
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	got := updated.(model).selected
+	got := asModel(t, updated).selected
 	want := "dev.shp-another"
 	if got != want {
 		t.Fatalf("selected = %q, want %q", got, want)
+	}
+}
+
+func TestModelEnterRejectsDefaultSuffixWithWhitespace(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.defaultItem = "dev.shp"
+	m.query = "-another name"
+	m.refilter()
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := asModel(t, updated).selected
+	if got != "" {
+		t.Fatalf("selected = %q, want empty", got)
+	}
+	if cmd != nil {
+		t.Fatalf("cmd = %v, want nil", cmd)
 	}
 }
 
@@ -135,7 +160,7 @@ func TestModelEnterRejectsNewNameWithWhitespace(t *testing.T) {
 	m.refilter()
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	got := updated.(model).selected
+	got := asModel(t, updated).selected
 	if got != "" {
 		t.Fatalf("selected = %q, want empty", got)
 	}
@@ -150,7 +175,7 @@ func TestModelEnterRejectsLeadingDashWithoutDefault(t *testing.T) {
 	m.refilter()
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	got := updated.(model).selected
+	got := asModel(t, updated).selected
 	if got != "" {
 		t.Fatalf("selected = %q, want empty", got)
 	}
@@ -174,10 +199,10 @@ func TestModelScrollsCursorIntoVisibleRange(t *testing.T) {
 	m := newModel([]string{"a", "b", "c", "d", "e"})
 
 	updated, _ := m.Update(tea.WindowSizeMsg{Height: 7})
-	m = updated.(model)
+	m = asModel(t, updated)
 	for i := 0; i < 4; i++ {
 		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-		m = updated.(model)
+		m = asModel(t, updated)
 	}
 
 	if m.cursor != 4 {

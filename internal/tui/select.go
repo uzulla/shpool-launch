@@ -197,10 +197,13 @@ func newSessionName(defaultItem, query string) (string, bool) {
 	if name == "" {
 		return "", false
 	}
+	if containsSpace(name) {
+		return "", false
+	}
 	if defaultItem != "" && strings.HasPrefix(name, "-") {
 		return defaultItem + name, true
 	}
-	if strings.HasPrefix(name, "-") || containsSpace(name) {
+	if strings.HasPrefix(name, "-") {
 		return "", false
 	}
 	return name, true
