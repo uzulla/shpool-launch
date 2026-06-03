@@ -45,9 +45,22 @@ func FromPath(path, home string) string {
 	needsSuffix := needsHashSuffix(rel)
 	nameInput := strings.ReplaceAll(rel, "/", ".")
 
+	name := Sanitize(nameInput)
+	if needsSuffix {
+		name += "-" + shortHash(rel)
+	}
+	return name
+}
+
+// Sanitize maps a string to the shpool session-name character set used
+// throughout this tool: only [A-Za-z0-9._-] are preserved and every other
+// rune becomes '_'. It is the single normalization rule that both
+// path-derived names and free-text (TUI) names go through, so that all
+// session names share one safe alphabet.
+func Sanitize(s string) string {
 	var b strings.Builder
-	b.Grow(len(nameInput) + 9)
-	for _, r := range nameInput {
+	b.Grow(len(s))
+	for _, r := range s {
 		switch {
 		case r >= 'a' && r <= 'z',
 			r >= 'A' && r <= 'Z',
@@ -57,10 +70,6 @@ func FromPath(path, home string) string {
 		default:
 			b.WriteRune('_')
 		}
-	}
-	if needsSuffix {
-		b.WriteByte('-')
-		b.WriteString(shortHash(rel))
 	}
 	return b.String()
 }

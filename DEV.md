@@ -128,6 +128,12 @@ attach には常に `--dir .` を渡す。既存セッションへの attach で
 - 上部に `QUERY> ...` を表示し、下にフィルタ済み候補
 - フィルタ: case-insensitive substring AND (`Filter(items, query)` として独立、テスト対象)
 - キー操作: 文字入力で絞り込み、Backspace、↑ / Ctrl-P、↓ / Ctrl-N、Enter、Esc / Ctrl-C
+- 絞り込み結果が0件の Enter は新規セッション名として query を返す（`newSessionName`）:
+  - `strings.TrimSpace` で前後空白を落とす。トリム後に内部空白が残る query は作成しない
+  - ダッシュのみ（`-`, `--` 等）の query は作成しない
+  - query が `-` で始まり cwd 既定項目がある場合は `defaultItem + query`（例: cwd が `work.company-a.api` で query が `-another` なら `work.company-a.api-another`）。ただし結合結果が `-` 始まりになる（既定名自体が `-` 始まり）場合は作成しない。cwd 既定項目がなければ作成しない
+  - 返す名前は `session.Sanitize` で cwd 由来名と同じ文字集合 (`[A-Za-z0-9._-]`、それ以外は `_`) に正規化する
+  - 表示ラベルは、実在セッション（`shpool list`）と一致すれば `(existing)`、合成された cwd 既定候補を含め未起動なら `(new)`
 - Backspace は rune 単位で削除する
 - 候補が端末高に収まらない場合はカーソル位置に合わせてスクロールする
 - `SelectWithDefault(items, defaultItem)` で「先頭に置く既定項目」を渡せる。既定項目は `(cwd)` ラベル付きで表示され、初期カーソル位置になる。既存リスト内に重複があれば dedupe。

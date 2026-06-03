@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/uzulla/shpool-launch/internal/session"
 )
 
 // ErrCancelled is returned when the user dismisses the UI (Esc / Ctrl-C).
@@ -31,6 +34,7 @@ func SelectWithDefault(items []string, defaultItem string) (string, error) {
 	}
 	m := newModel(all)
 	m.defaultItem = defaultItem
+	m.sessions = append([]string(nil), items...)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	final, err := p.Run()
 	if err != nil {
@@ -105,6 +109,10 @@ type model struct {
 	selected    string
 	cancelled   bool
 	defaultItem string
+	// sessions is the set of real `shpool list` sessions, excluding the
+	// synthetic cwd default that orderWithDefault injects into `all`. It is
+	// what distinguishes an existing session from a to-be-created one.
+	sessions []string
 }
 
 func newModel(items []string) model {
@@ -129,9 +137,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cancelled = true
 		return m, tea.Quit
 	case tea.KeyEnter:
-		if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
-			m.selected = m.filtered[m.cursor]
+		selected := m.currentSelection()
+		if selected == "" {
+			return m, nil
 		}
+		m.selected = selected
 		return m, tea.Quit
 	case tea.KeyUp, tea.KeyCtrlP:
 		if m.cursor > 0 {
@@ -176,6 +186,65 @@ func (m *model) refilter() {
 		m.cursor = 0
 	}
 	m.ensureCursorVisible()
+}
+
+func (m model) currentSelection() string {
+	if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
+		return m.filtered[m.cursor]
+	}
+	name, ok := newSessionName(m.defaultItem, m.query)
+	if !ok {
+		return ""
+	}
+	return name
+}
+
+// isExistingSession reports whether name is a real `shpool list` session,
+// not merely the synthetic cwd default injected for display.
+func (m model) isExistingSession(name string) bool {
+	for _, it := range m.sessions {
+		if it == name {
+			return true
+		}
+	}
+	return false
+}
+
+func newSessionName(defaultItem, query string) (string, bool) {
+	name := strings.TrimSpace(query)
+	if name == "" {
+		return "", false
+	}
+	if containsSpace(name) {
+		return "", false
+	}
+	if strings.Trim(name, "-") == "" {
+		// Dash-only input ("-", "--", ...) is not a meaningful name.
+		return "", false
+	}
+	if defaultItem != "" && strings.HasPrefix(name, "-") {
+		candidate := session.Sanitize(defaultItem + name)
+		// Reject when defaultItem itself starts with "-" (e.g. a "~/-repo"
+		// cwd): the combined name would lead with "-" and be misread as an
+		// option by `shpool attach`.
+		if strings.HasPrefix(candidate, "-") {
+			return "", false
+		}
+		return candidate, true
+	}
+	if strings.HasPrefix(name, "-") {
+		return "", false
+	}
+	return session.Sanitize(name), true
+}
+
+func containsSpace(s string) bool {
+	for _, r := range s {
+		if unicode.IsSpace(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func dropLastRune(s string) string {
@@ -239,7 +308,23 @@ func (m model) View() string {
 	b.WriteString("\n\n")
 
 	if len(m.filtered) == 0 {
-		b.WriteString(dimStyle.Render("  (no matches)"))
+		if name, ok := newSessionName(m.defaultItem, m.query); ok {
+			b.WriteString(cursorStyle.Render("> "))
+			b.WriteString(selectedStyle.Render(name))
+			b.WriteString(" ")
+			// The normalized name can collide with an existing session (e.g.
+			// query "foo/bar" sanitizes to an existing "foo_bar"); label it
+			// honestly so the user knows Enter reattaches, not creates.
+			if m.isExistingSession(name) {
+				b.WriteString(dimStyle.Render("(existing)"))
+			} else {
+				b.WriteString(dimStyle.Render("(new)"))
+			}
+		} else if strings.TrimSpace(m.query) != "" {
+			b.WriteString(dimStyle.Render("  (invalid session name)"))
+		} else {
+			b.WriteString(dimStyle.Render("  (no matches)"))
+		}
 		b.WriteString("\n")
 	}
 	start, end := m.visibleRange()
@@ -259,7 +344,7 @@ func (m model) View() string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("Enter: attach   Esc/Ctrl-C: cancel   ↑/↓ or Ctrl-P/N: move"))
+	b.WriteString(dimStyle.Render("Enter: attach/create   Esc/Ctrl-C: cancel   ↑/↓ or Ctrl-P/N: move"))
 	b.WriteString("\n")
 	return b.String()
 }
