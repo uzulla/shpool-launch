@@ -129,9 +129,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cancelled = true
 		return m, tea.Quit
 	case tea.KeyEnter:
-		if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
-			m.selected = m.filtered[m.cursor]
-		}
+		m.selected = m.currentSelection()
 		return m, tea.Quit
 	case tea.KeyUp, tea.KeyCtrlP:
 		if m.cursor > 0 {
@@ -176,6 +174,24 @@ func (m *model) refilter() {
 		m.cursor = 0
 	}
 	m.ensureCursorVisible()
+}
+
+func (m model) currentSelection() string {
+	if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
+		return m.filtered[m.cursor]
+	}
+	return newSessionName(m.defaultItem, m.query)
+}
+
+func newSessionName(defaultItem, query string) string {
+	name := strings.TrimSpace(query)
+	if name == "" {
+		return ""
+	}
+	if defaultItem != "" && strings.HasPrefix(name, "-") {
+		return defaultItem + name
+	}
+	return name
 }
 
 func dropLastRune(s string) string {
@@ -239,7 +255,14 @@ func (m model) View() string {
 	b.WriteString("\n\n")
 
 	if len(m.filtered) == 0 {
-		b.WriteString(dimStyle.Render("  (no matches)"))
+		if name := newSessionName(m.defaultItem, m.query); name != "" {
+			b.WriteString(cursorStyle.Render("> "))
+			b.WriteString(selectedStyle.Render(name))
+			b.WriteString(" ")
+			b.WriteString(dimStyle.Render("(new)"))
+		} else {
+			b.WriteString(dimStyle.Render("  (no matches)"))
+		}
 		b.WriteString("\n")
 	}
 	start, end := m.visibleRange()
@@ -259,7 +282,7 @@ func (m model) View() string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("Enter: attach   Esc/Ctrl-C: cancel   ↑/↓ or Ctrl-P/N: move"))
+	b.WriteString(dimStyle.Render("Enter: attach/create   Esc/Ctrl-C: cancel   ↑/↓ or Ctrl-P/N: move"))
 	b.WriteString("\n")
 	return b.String()
 }

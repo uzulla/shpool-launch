@@ -2,6 +2,7 @@ package tui
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -73,6 +74,58 @@ func TestModelBackspaceRemovesWholeRune(t *testing.T) {
 	want := "あ"
 	if got != want {
 		t.Fatalf("query = %q, want %q", got, want)
+	}
+}
+
+func TestModelEnterSelectsHighlightedMatch(t *testing.T) {
+	m := newModel([]string{"alpha", "beta"})
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := updated.(model).selected
+	want := "beta"
+	if got != want {
+		t.Fatalf("selected = %q, want %q", got, want)
+	}
+}
+
+func TestModelEnterCreatesTypedNameWhenNoMatch(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.query = "new-session"
+	m.refilter()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := updated.(model).selected
+	want := "new-session"
+	if got != want {
+		t.Fatalf("selected = %q, want %q", got, want)
+	}
+}
+
+func TestModelEnterCreatesDefaultSuffixWhenNoMatch(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.defaultItem = "dev.shp"
+	m.query = "-another"
+	m.refilter()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := updated.(model).selected
+	want := "dev.shp-another"
+	if got != want {
+		t.Fatalf("selected = %q, want %q", got, want)
+	}
+}
+
+func TestModelViewShowsNewDefaultSuffixCandidate(t *testing.T) {
+	m := newModel([]string{"dev.shp"})
+	m.defaultItem = "dev.shp"
+	m.query = "-another"
+	m.refilter()
+
+	got := m.View()
+	if !strings.Contains(got, "dev.shp-another") {
+		t.Fatalf("View() = %q, want new session candidate", got)
 	}
 }
 

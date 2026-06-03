@@ -19,7 +19,8 @@ const usage = `shp - shpool attach helper
 Usage:
   shp                      Show a TUI picker. The cwd-derived session name is
                            the default selection; existing sessions follow
-                           when available. Enter attaches.
+                           when available. Enter attaches or creates when no
+                           match is found.
   shp <session-name>       Attach to the given session name (no TUI).
   shp -f                   Force-attach to a session named after the current
                            directory (no TUI).
