@@ -194,6 +194,16 @@ func (m model) currentSelection() string {
 	return name
 }
 
+// contains reports whether name is already one of the listed sessions.
+func (m model) contains(name string) bool {
+	for _, it := range m.all {
+		if it == name {
+			return true
+		}
+	}
+	return false
+}
+
 func newSessionName(defaultItem, query string) (string, bool) {
 	name := strings.TrimSpace(query)
 	if name == "" {
@@ -296,7 +306,14 @@ func (m model) View() string {
 			b.WriteString(cursorStyle.Render("> "))
 			b.WriteString(selectedStyle.Render(name))
 			b.WriteString(" ")
-			b.WriteString(dimStyle.Render("(new)"))
+			// The normalized name can collide with an existing session (e.g.
+			// query "foo/bar" sanitizes to an existing "foo_bar"); label it
+			// honestly so the user knows Enter reattaches, not creates.
+			if m.contains(name) {
+				b.WriteString(dimStyle.Render("(existing)"))
+			} else {
+				b.WriteString(dimStyle.Render("(new)"))
+			}
 		} else if strings.TrimSpace(m.query) != "" {
 			b.WriteString(dimStyle.Render("  (invalid session name)"))
 		} else {

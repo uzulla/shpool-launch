@@ -91,11 +91,14 @@ func TestModelEnterSelectsHighlightedMatch(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = asModel(t, updated)
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := asModel(t, updated).selected
 	want := "beta"
 	if got != want {
 		t.Fatalf("selected = %q, want %q", got, want)
+	}
+	if cmd == nil {
+		t.Fatalf("cmd = nil, want quit command")
 	}
 }
 
@@ -104,11 +107,14 @@ func TestModelEnterCreatesTypedNameWhenNoMatch(t *testing.T) {
 	m.query = "new-session"
 	m.refilter()
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := asModel(t, updated).selected
 	want := "new-session"
 	if got != want {
 		t.Fatalf("selected = %q, want %q", got, want)
+	}
+	if cmd == nil {
+		t.Fatalf("cmd = nil, want quit command")
 	}
 }
 
@@ -118,11 +124,14 @@ func TestModelEnterCreatesDefaultSuffixWhenNoMatch(t *testing.T) {
 	m.query = "-another"
 	m.refilter()
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := asModel(t, updated).selected
 	want := "dev.shp-another"
 	if got != want {
 		t.Fatalf("selected = %q, want %q", got, want)
+	}
+	if cmd == nil {
+		t.Fatalf("cmd = nil, want quit command")
 	}
 }
 
@@ -221,11 +230,31 @@ func TestModelEnterNormalizesNewNameToSafeCharset(t *testing.T) {
 	m.query = "foo/bar"
 	m.refilter()
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	got := asModel(t, updated).selected
 	want := "foo_bar"
 	if got != want {
 		t.Fatalf("selected = %q, want %q", got, want)
+	}
+	if cmd == nil {
+		t.Fatalf("cmd = nil, want quit command")
+	}
+}
+
+func TestModelViewLabelsSanitizedCollisionAsExisting(t *testing.T) {
+	m := newModel([]string{"foo_bar", "dev.shp"})
+	m.query = "foo/bar" // sanitizes to the existing "foo_bar"
+	m.refilter()
+
+	got := m.View()
+	if !strings.Contains(got, "foo_bar") {
+		t.Fatalf("View() = %q, want candidate foo_bar", got)
+	}
+	if strings.Contains(got, "(new)") {
+		t.Fatalf("View() = %q, must not label an existing session as (new)", got)
+	}
+	if !strings.Contains(got, "(existing)") {
+		t.Fatalf("View() = %q, want (existing) label", got)
 	}
 }
 
