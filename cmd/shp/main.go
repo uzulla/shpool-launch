@@ -30,6 +30,9 @@ Usage:
   shp -h | --help          Show this help.
 
 New sessions are created in the current directory.
+In the home directory (or filesystem root), where no name can be derived from
+a relative path, the session name falls back to one derived from the full path
+(e.g. "home.<user>"), so shp still launches instead of dead-ending.
 shpool must be installed and on PATH.
 `
 
@@ -64,7 +67,7 @@ func run(args []string) error {
 		if len(rest) > 0 {
 			return fmt.Errorf("--print-name takes no arguments")
 		}
-		name, err := session.FromCwd()
+		name, err := session.FromCwdOrFallback()
 		if err != nil {
 			return err
 		}
@@ -81,14 +84,12 @@ func run(args []string) error {
 		return fmt.Errorf("too many arguments")
 	}
 
-	// `shp -f` without a name: force-attach directly to the cwd-derived name.
+	// `shp -f` without a name: force-attach directly to the cwd-derived name,
+	// or the full-path fallback when the cwd yields none (home / root).
 	if force {
-		name, err := session.FromCwd()
+		name, err := session.FromCwdOrFallback()
 		if err != nil {
 			return err
-		}
-		if name == "" {
-			return fmt.Errorf("could not derive a session name from the current directory")
 		}
 		return shpool.Attach(name, true)
 	}
@@ -98,7 +99,11 @@ func run(args []string) error {
 }
 
 func runPicker() error {
-	cwdName, err := session.FromCwd()
+	// Use the full-path fallback when the cwd yields no name (the home
+	// directory itself or the filesystem root) so the picker always has a
+	// default create-entry, just like any other directory, instead of
+	// dead-ending with "no sessions".
+	cwdName, err := session.FromCwdOrFallback()
 	if err != nil {
 		return err
 	}
@@ -109,17 +114,6 @@ func runPicker() error {
 			return err
 		}
 		sessions = nil
-	}
-
-	// The home directory (and the filesystem root) yields no cwd-derived name.
-	// With no existing sessions to pick from either, fall back to a name
-	// derived from the full path so `shp` still launches shpool instead of
-	// dead-ending. When sessions do exist, the picker lists them as before.
-	if cwdName == "" && len(sessions) == 0 {
-		cwdName, err = session.FallbackName()
-		if err != nil {
-			return err
-		}
 	}
 
 	picked, err := tui.SelectWithDefault(sessions, cwdName)

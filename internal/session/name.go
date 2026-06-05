@@ -20,6 +20,21 @@ func FromCwd() (string, error) {
 	return FromPath(cwd, home), nil
 }
 
+// FromCwdOrFallback returns the cwd-derived session name, falling back to
+// FallbackName when the cwd yields no name (the home directory itself or the
+// filesystem root). The result is always non-empty, so callers can attach or
+// print a name without dead-ending.
+func FromCwdOrFallback() (string, error) {
+	name, err := FromCwd()
+	if err != nil {
+		return "", err
+	}
+	if name != "" {
+		return name, nil
+	}
+	return FallbackName()
+}
+
 // FallbackName returns a session name to use when FromCwd yields no name,
 // which happens in the home directory itself or at the filesystem root. It
 // derives the name from the full absolute path (without stripping the home

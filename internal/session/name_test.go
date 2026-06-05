@@ -127,6 +127,46 @@ func TestFallbackName_RootFallsBackToShell(t *testing.T) {
 	}
 }
 
+func TestFromCwdOrFallback_AtHomeUsesFallback(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skipf("no home directory: %v", err)
+	}
+	t.Chdir(home)
+
+	// The real trigger for the fallback: at home, FromCwd derives nothing.
+	if got, _ := FromCwd(); got != "" {
+		t.Fatalf("FromCwd() at home = %q, want empty (precondition for fallback)", got)
+	}
+
+	got, err := FromCwdOrFallback()
+	if err != nil {
+		t.Fatalf("FromCwdOrFallback() error: %v", err)
+	}
+	if got == "" {
+		t.Errorf("FromCwdOrFallback() at home = %q, want non-empty", got)
+	}
+	if want, _ := FallbackName(); got != want {
+		t.Errorf("FromCwdOrFallback() = %q, want FallbackName() = %q", got, want)
+	}
+}
+
+func TestFromCwdOrFallback_OutsideHomeUsesCwdName(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	cwd, _ := FromCwd()
+	if cwd == "" {
+		t.Skip("temp dir derived an empty name; cannot assert passthrough")
+	}
+	got, err := FromCwdOrFallback()
+	if err != nil {
+		t.Fatalf("FromCwdOrFallback() error: %v", err)
+	}
+	if got != cwd {
+		t.Errorf("FromCwdOrFallback() = %q, want FromCwd() = %q", got, cwd)
+	}
+}
+
 func TestFromPath_DisambiguatesSanitizedCollisions(t *testing.T) {
 	gotSpace := FromPath("/Users/u/foo bar", "/Users/u")
 	gotUnderscore := FromPath("/Users/u/foo_bar", "/Users/u")
