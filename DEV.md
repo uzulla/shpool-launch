@@ -101,6 +101,8 @@ internal/tui/select_test.go
 | `/Users/uzulla/プロジェクト/api`  | `______.api-f10f1a6e` (非ASCIIは1文字あたり `_` + suffix) |
 | `/srv/app-v1.2.3/api`              | `srv.app-v1.2.3.api-597dbea5` |
 
+ホームディレクトリそのもの（相対パスが空になる）やファイルシステムのルートでは相対パス由来の名前が空になる。この場合は `session.FallbackName()` が `$HOME` を取り除かないフルパスから名前を生成する（例: `/home/developer` → `home.developer`）。フルパスでも空になるルート `/` のみ `shell` に固定フォールバックする。`shp` (引数なし) / `shp -f` / `shp --print-name` はいずれも `session.FromCwdOrFallback()` を通すので、ホーム/ルートでも空にならず一貫して起動・出力できる。
+
 MVP ではこのルールは固定。将来は `~/work` や `~/src` を root として相対化するなどの設定を追加できる設計にしてある (`session.FromPath(path, home)` で home を引数化済み)。
 
 ## attach の実行方式
@@ -118,7 +120,7 @@ attach には常に `--dir .` を渡す。既存セッションへの attach で
 - 空行を除外
 - `NAME STATUS` のヘッダ行を除外
 - 各行の先頭カラムをセッション名として扱う
-- 候補が0件なら標準エラーに `No shpool sessions found.` を表示して終了
+- 既存セッションが0件でも、cwd 由来名（空ならフルパス由来のフォールバック名）を既定候補として picker を表示し、`shp` がそのまま起動できるようにする
 
 ## TUI
 
@@ -147,8 +149,8 @@ MVP では fuzzy / negative / 正規表現 / 複数選択 / preview pane / sort 
 | 状況 | 出力 | 終了コード |
 | --- | --- | --- |
 | `shpool` が PATH に無い | `Error: shpool command not found in PATH. Please install shpool first` | 1 |
-| `shpool list` で一覧取得不可 | cwd 候補だけを表示。cwd 名も空なら `No shpool sessions found.` | 0 |
+| `shpool list` で一覧取得不可 | cwd 候補（空ならフォールバック名）だけを表示 | 0 |
 | `shpool list` 失敗 (一覧取得不可として扱わないもの) | `Error: shpool list failed: <stderr>` | 1 |
-| セッション0件 | `No shpool sessions found.` (stderr) | 0 |
+| セッション0件 | cwd 候補（空ならフォールバック名）だけの picker を表示 | 0 |
 | TUI でキャンセル | (何も出さない) | 0 |
 | 不正な引数 | `Error: too many arguments` 等 + usage | 1 |
