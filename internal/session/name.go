@@ -20,6 +20,25 @@ func FromCwd() (string, error) {
 	return FromPath(cwd, home), nil
 }
 
+// FallbackName returns a session name to use when FromCwd yields no name,
+// which happens in the home directory itself or at the filesystem root. It
+// derives the name from the full absolute path (without stripping the home
+// prefix), so the home directory maps to e.g. "home.developer" rather than
+// dead-ending. This keeps the name unique and consistent with FromPath's
+// naming rules. It falls back to "shell" only when even the full path yields
+// nothing (the filesystem root).
+func FallbackName() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("get cwd: %w", err)
+	}
+	name := FromPath(cwd, "")
+	if name == "" {
+		name = "shell"
+	}
+	return name, nil
+}
+
 // FromPath converts an absolute path to a session name.
 // If home is non-empty and path is under home, the home prefix is stripped first.
 func FromPath(path, home string) string {

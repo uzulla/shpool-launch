@@ -111,9 +111,15 @@ func runPicker() error {
 		sessions = nil
 	}
 
+	// The home directory (and the filesystem root) yields no cwd-derived name.
+	// With no existing sessions to pick from either, fall back to a name
+	// derived from the full path so `shp` still launches shpool instead of
+	// dead-ending. When sessions do exist, the picker lists them as before.
 	if cwdName == "" && len(sessions) == 0 {
-		fmt.Fprintln(os.Stderr, "No shpool sessions found.")
-		return nil
+		cwdName, err = session.FallbackName()
+		if err != nil {
+			return err
+		}
 	}
 
 	picked, err := tui.SelectWithDefault(sessions, cwdName)
