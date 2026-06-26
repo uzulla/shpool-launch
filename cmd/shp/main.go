@@ -22,9 +22,9 @@ Usage:
                            when available. Enter attaches or creates when no
                            match is found.
   shp <session-name>       Attach to the given session name (no TUI).
-  shp -f                   Force-attach to a session named after the current
-                           directory (no TUI).
-  shp -f <session-name>    Force-attach to the given session name.
+  shp -f                   Show the TUI picker (like plain shp) and
+                           force-attach to the chosen/created session.
+  shp -f <session-name>    Force-attach to the given session name (no TUI).
   shp --print-name         Print the session name generated from the current
                            directory and exit.
   shp -h | --help          Show this help.
@@ -84,21 +84,13 @@ func run(args []string) error {
 		return fmt.Errorf("too many arguments")
 	}
 
-	// `shp -f` without a name: force-attach directly to the cwd-derived name,
-	// or the full-path fallback when the cwd yields none (home / root).
-	if force {
-		name, err := session.FromCwdOrFallback()
-		if err != nil {
-			return err
-		}
-		return shpool.Attach(name, true)
-	}
-
-	// `shp` (no args, no -f): show picker with cwd-name as the default entry.
-	return runPicker()
+	// `shp` / `shp -f` (no name): show the picker with the cwd name as the
+	// default entry. `force` is carried through to the final attach, so
+	// `shp -f` lets the user pick/create a session and force-attaches to it.
+	return runPicker(force)
 }
 
-func runPicker() error {
+func runPicker(force bool) error {
 	// Use the full-path fallback when the cwd yields no name (the home
 	// directory itself or the filesystem root) so the picker always has a
 	// default create-entry, just like any other directory, instead of
@@ -123,5 +115,5 @@ func runPicker() error {
 		}
 		return err
 	}
-	return shpool.Attach(picked, false)
+	return shpool.Attach(picked, force)
 }
